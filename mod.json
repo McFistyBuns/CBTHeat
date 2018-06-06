@@ -1,0 +1,18 @@
+{
+    "Name": "CBTHeat",
+    "Enabled": true,
+
+    "Version": "v0.1",
+    "Description": "Adopts Classic Battletech Tabletop heat checks",
+    "Author": "Joe Guetler",
+    "Website": "",
+    "Contact": "",
+
+	"DLL": "CBTHeat.dll",
+
+    "Settings": {
+        "ShutdownPercentages": [0.083, 0.278, 0.583, 0.833],
+        "AmmoExplosionPercentages": [0, 0.083, 0.278, 0.583],
+        "HeatToHitModifiers": [1, 2, 3, 4]
+    }
+}
