@@ -84,6 +84,7 @@ namespace CBTHeat
 
             if (__instance.IsOverheated)
             {
+                float gutsBonus = (float)__instance.SkillGuts / __instance.Combat.Constants.PilotingConstants.GutsDivisor;
                 float skillRoll = __instance.Combat.NetworkRandom.Float();
                 float ammoRoll = __instance.Combat.NetworkRandom.Float();
 
@@ -95,10 +96,19 @@ namespace CBTHeat
                 {
                     heatLogger.Log(string.Format("[CBTHeat] Turns Overheated: {0}", turnsOverheated));
                     heatLogger.Log(string.Format("[CBTHeat] Intiating Shutdown Override Check"));
+                    heatLogger.Log(string.Format("[CBTHeat] Guts Bonus: {0}", gutsBonus));
                     heatLogger.Log(string.Format("[CBTHeat] Skill Roll: {0}", skillRoll));
+                    heatLogger.Log(string.Format("[CBTHeat] Skill + Guts Roll: {0}", skillRoll+gutsBonus));
                     heatLogger.Log(string.Format("[CBTHeat] Ammo Roll: {0}", ammoRoll));
+                    heatLogger.Log(string.Format("[CBTHeat] Ammo + Guts Roll: {0}", ammoRoll+gutsBonus));
                     heatLogger.Log(string.Format("[CBTHeat] Skill Target: {0}", shutdownPercentage));
                     heatLogger.Log(string.Format("[CBTHeat] Ammo Roll Target: {0}", ammoExplosionPercentage));
+                }
+
+                if (CBTHeat.Settings.UseGuts)
+                {
+                    ammoRoll = ammoRoll + gutsBonus;
+                    skillRoll = skillRoll + gutsBonus;
                 }
 
                 MultiSequence sequence = new MultiSequence(__instance.Combat);
@@ -175,6 +185,9 @@ namespace CBTHeat
         [JsonProperty("HeatToHitModifiers")]
         //public IList<int> HeatToHitModifiers = new List<int>() { 1, 2, 3, 4 };
         public IList<int> HeatToHitModifiers { get; set; }
+
+        [JsonProperty("UseGuts")]
+        public bool UseGuts;
     }
 
     public static class CBTHeat
