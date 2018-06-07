@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BattleTech;
 using BattleTech.UI;
+using HBS.Util;
 using Harmony;
 using HBS;
 using SVGImporter;
@@ -63,7 +64,7 @@ namespace CBTHeat
             }
             else if (mech.IsOverheated)
             {
-                string descr = string.Format("This unit is in danger of Shutting Down and having Ammo Explode each turn while Overheating.\nShutdown Chance: {0:P2}\nAmmo Explosion Chance: {1:P2}", CBTHeat.getShutdownPercentageForTurn(turnsOverheated), CBTHeat.getAmmoExplosionPercentageForTurn(turnsOverheated));
+                string descr = string.Format("This unit may trigger a Shutdown at the end of the turn unless heat falls below critical levels.\nShutdown Chance: {0:P2}\nAmmo Explosion Chance: {1:P2}", CBTHeat.getShutdownPercentageForTurn(turnsOverheated), CBTHeat.getAmmoExplosionPercentageForTurn(turnsOverheated));
                 methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusOverheatingIcon, "OVERHEATING", descr, __instance.defaultIconScale, false });
             }
         }
@@ -100,12 +101,11 @@ namespace CBTHeat
                     heatLogger.Log(string.Format("[CBTHeat] Ammo Roll Target: {0}", ammoExplosionPercentage));
                 }
 
-                CameraControl.Instance.ShowDeathCam(__instance, false, -1f);
-                             
+                MultiSequence sequence = new MultiSequence(__instance.Combat);
+                sequence.SetCamera(CameraControl.Instance.ShowDeathCam(__instance, false, -1f), 0);
+
                 if (ammoRoll < ammoExplosionPercentage)
                 {
-                    CameraControl.Instance.ShowDeathCam(__instance, false, -1f);
-
                     __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Ammo Overheated!", FloatieMessage.MessageNature.CriticalHit));
 
                     foreach (AmmunitionBox ammoBox in __instance.ammoBoxes)
@@ -124,14 +124,10 @@ namespace CBTHeat
                 } 
                 else
                 {
-                    CameraControl.Instance.ShowDeathCam(__instance, false, -1f);
-
-                    __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Ammo Explosion Avoided!", FloatieMessage.MessageNature.Debuff));
+                    sequence.AddChildSequence(new ShowActorInfoSequence(__instance, "Ammo Explosion Avoided!", FloatieMessage.MessageNature.Debuff, true), sequence.ChildSequenceCount - 1);
 
                     if (!__instance.IsPastMaxHeat)
                     {
-                        __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Emergency Shutdown Initiated!", FloatieMessage.MessageNature.Debuff));
-
                         if (skillRoll < shutdownPercentage)
                         {
                             if (heatLogger.IsLogEnabled)
@@ -139,10 +135,8 @@ namespace CBTHeat
                                 heatLogger.Log(string.Format("[CBTHeat] Skill Check Failed! Initiating Shutdown"));
                             }
 
-                            CameraControl.Instance.ShowDeathCam(__instance, false, -1f);
-
-                            MechHeatSequence previousSequence = new MechHeatSequence(__instance, false, false, null);
-                            __instance.GenerateOverheatedSequence(previousSequence);
+                            MechEmergencyShutdownSequence mechShutdownSequence = new MechEmergencyShutdownSequence(__instance);
+                            sequence.AddChildSequence(mechShutdownSequence, sequence.ChildSequenceCount - 1);
 
                             __instance.StatCollection.Set<int>("TurnsOverheated", 0);
                         }
@@ -153,9 +147,7 @@ namespace CBTHeat
                                 heatLogger.Log(string.Format("[CBTHeat] Skill Check Succeeded!"));
                             }
 
-                            CameraControl.Instance.ShowDeathCam(__instance, false, -1f);
-
-                            __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Shutdown Override Succeeded!", FloatieMessage.MessageNature.Buff));
+                            sequence.AddChildSequence(new ShowActorInfoSequence(__instance, "Shutdown Override Successful!", FloatieMessage.MessageNature.Buff, true), sequence.ChildSequenceCount - 1);
 
                             turnsOverheated += 1;
                             __instance.StatCollection.Set<int>("TurnsOverheated", turnsOverheated);
@@ -163,7 +155,9 @@ namespace CBTHeat
                     }
                 }
 
-                __instance.Combat.MessageCenter.PublishMessage(new AddSequenceToStackMessage(new DelaySequence(__instance.Combat, 2f)));
+                sequence.AddChildSequence(new DelaySequence(__instance.Combat, 2f), sequence.ChildSequenceCount - 1);
+
+                __instance.Combat.MessageCenter.PublishMessage(new AddSequenceToStackMessage(sequence));
             }
         }
     }
@@ -251,6 +245,107 @@ namespace CBTHeat
             }
 
             return (float)CBTHeat.Settings.HeatToHitModifiers[turn - 1];
+        }
+    }
+}
+
+namespace BattleTech {
+    public class MechEmergencyShutdownSequence : MultiSequence
+    {
+        public MechEmergencyShutdownSequence(Mech mech) : base(mech.Combat)
+        {
+            this.OwningMech = mech;
+            this.setState();
+        }
+
+        private Mech OwningMech { get; set; }
+
+        private void setState()
+        {
+            Mech.heatLogger.Log("Mech " + this.OwningMech.DisplayName + " shuts down from overheating");
+            this.OwningMech.IsShutDown = true;
+            this.OwningMech.DumpAllEvasivePips();
+        }
+
+        public override void OnAdded()
+        {
+            base.OnAdded();
+            if (this.OwningMech.GameRep != null)
+            {
+                string text = string.Format("MechOverheatSequence_{0}_{1}", base.RootSequenceGUID, base.SequenceGUID);
+                AudioEventManager.CreateVOQueue(text, -1f, null, null);
+                AudioEventManager.QueueVOEvent(text, VOEvents.Mech_Overheat_Shutdown, this.OwningMech);
+                AudioEventManager.StartVOQueue(1f);
+                this.OwningMech.GameRep.PlayVFX(1, this.OwningMech.Combat.Constants.VFXNames.heat_heatShutdown, true, Vector3.zero, false, -1f);
+                this.AddChildSequence(new ShowActorInfoSequence(this.OwningMech, "Emergency Shutdown Initiated!", FloatieMessage.MessageNature.Debuff, true), this.ChildSequenceCount - 1);
+                WwiseManager.PostEvent<AudioEventList_ui>(AudioEventList_ui.ui_overheat_alarm_3, WwiseManager.GlobalAudioObject, null, null);
+                if (this.OwningMech.team.LocalPlayerControlsTeam)
+                {
+                    AudioEventManager.PlayAudioEvent("audioeventdef_musictriggers_combat", "friendly_overheating", null, null);
+                }
+            }
+        }
+
+        public override void OnUpdate()
+        {
+            base.OnUpdate();
+        }
+
+        public override void OnSuspend()
+        {
+            base.OnSuspend();
+        }
+
+        public override void OnResume()
+        {
+            base.OnResume();
+        }
+
+        public override void OnComplete()
+        {
+            base.OnComplete();
+        }
+
+        public override bool IsValidMultiSequenceChild
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        public override bool IsParallelInterruptable
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        public override bool IsCancelable
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        public override bool IsComplete
+        {
+            get
+            {
+                return base.IsComplete;
+            }
+        }
+
+        public override int Size()
+        {
+            return 0;
+        }
+
+        public override bool ShouldSave()
+        {
+            return false;
         }
     }
 }
