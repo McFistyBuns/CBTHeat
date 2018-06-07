@@ -187,7 +187,7 @@ namespace CBTHeat
         public IList<int> HeatToHitModifiers { get; set; }
 
         [JsonProperty("UseGuts")]
-        public bool UseGuts;
+        public bool UseGuts { get; set; }
     }
 
     public static class CBTHeat
