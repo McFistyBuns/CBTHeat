@@ -15,6 +15,9 @@ These chances are also displayed in the Overheat notification badge above the he
 
 All chances and modifiers are configurable in the mod.json file.
 
+v0.1.1 adds the ability to add a Guts Modifier to the Ammo Explosion and Shutdown chance rolls.  This is disabled by default.  To enable it, change the "UseGuts" setting to true in mod.json.
+The Guts modifier is currently calculated by essentially taking Guts / GutsDivisor.  The base GutsDivisor of 20 was too low, so I changed it to 40.  So a Guts of 5 would add 12.5% to the 2 rolls.
+
 ## Installation
 
 Install [BTML](https://github.com/Mpstark/BattleTechModLoader) and [ModTek](https://github.com/Mpstark/ModTek). Extract files to `BATTLETECH\Mods\CBTHeat\`.
