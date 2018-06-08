@@ -84,7 +84,8 @@ namespace CBTHeat
 
             if (__instance.IsOverheated)
             {
-                float gutsBonus = (float)__instance.SkillGuts / __instance.Combat.Constants.PilotingConstants.GutsDivisor;
+                PilotingRules rules = new PilotingRules(__instance.Combat);
+                float gutsTestChance = rules.GetGutsTestChance(__instance);
                 float skillRoll = __instance.Combat.NetworkRandom.Float();
                 float ammoRoll = __instance.Combat.NetworkRandom.Float();
 
@@ -96,19 +97,21 @@ namespace CBTHeat
                 {
                     heatLogger.Log(string.Format("[CBTHeat] Turns Overheated: {0}", turnsOverheated));
                     heatLogger.Log(string.Format("[CBTHeat] Intiating Shutdown Override Check"));
-                    heatLogger.Log(string.Format("[CBTHeat] Guts Bonus: {0}", gutsBonus));
+                    heatLogger.Log(string.Format("[CBTHeat] Guts Skill: {0}", (float)__instance.SkillGuts));
+                    heatLogger.Log(string.Format("[CBTHeat] Guts Divisor: {0}", __instance.Combat.Constants.PilotingConstants.GutsDivisor));
+                    heatLogger.Log(string.Format("[CBTHeat] Guts Bonus: {0}", gutsTestChance));
                     heatLogger.Log(string.Format("[CBTHeat] Skill Roll: {0}", skillRoll));
-                    heatLogger.Log(string.Format("[CBTHeat] Skill + Guts Roll: {0}", skillRoll+gutsBonus));
+                    heatLogger.Log(string.Format("[CBTHeat] Skill + Guts Roll: {0}", skillRoll+gutsTestChance));
                     heatLogger.Log(string.Format("[CBTHeat] Ammo Roll: {0}", ammoRoll));
-                    heatLogger.Log(string.Format("[CBTHeat] Ammo + Guts Roll: {0}", ammoRoll+gutsBonus));
+                    heatLogger.Log(string.Format("[CBTHeat] Ammo + Guts Roll: {0}", ammoRoll+gutsTestChance));
                     heatLogger.Log(string.Format("[CBTHeat] Skill Target: {0}", shutdownPercentage));
                     heatLogger.Log(string.Format("[CBTHeat] Ammo Roll Target: {0}", ammoExplosionPercentage));
                 }
 
                 if (CBTHeat.Settings.UseGuts)
                 {
-                    ammoRoll = ammoRoll + gutsBonus;
-                    skillRoll = skillRoll + gutsBonus;
+                    ammoRoll = ammoRoll + gutsTestChance;
+                    skillRoll = skillRoll + gutsTestChance;
                 }
 
                 MultiSequence sequence = new MultiSequence(__instance.Combat);
