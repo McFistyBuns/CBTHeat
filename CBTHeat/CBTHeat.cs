@@ -175,6 +175,22 @@ namespace CBTHeat
         }
     }
 
+
+    [HarmonyPatch(typeof(Mech))]
+    [HarmonyPatch("MoveMultiplier", PropertyMethod.Getter)]
+    public static class Mech_MoveMultiplier_Patch
+    {
+        private static void Postfix(Mech __instance, ref float __result)
+        {
+            int turnsOverheated = __instance.StatCollection.GetValue<int>("TurnsOverheated");
+
+            if (__instance.IsOverheated && turnsOverheated > 0)
+            {
+                __result -= CBTHeat.getOverheatedMovePenaltyForTurn(turnsOverheated);
+            }
+        }
+    }
+
     internal class ModSettings
     {
         [JsonProperty("ShutdownPercentages")]
@@ -191,6 +207,10 @@ namespace CBTHeat
 
         [JsonProperty("UseGuts")]
         public bool UseGuts { get; set; }
+
+        [JsonProperty("OverheatedMovePenalty")]
+        //public IList<float> OverheatedMovePenalty = new List<float>() { 0.1f, 0.2f, 0.3f, 0.4f };
+        public IList<float> OverheatedMovePenalty { get; set; }
     }
 
     public static class CBTHeat
@@ -244,6 +264,23 @@ namespace CBTHeat
             }
 
             return CBTHeat.Settings.AmmoExplosionPercentages[turn];
+        }
+
+        public static float getOverheatedMovePenaltyForTurn(int turn)
+        {
+            int count = CBTHeat.Settings.OverheatedMovePenalty.Count;
+
+            if (turn <= 0)
+            {
+                return (float)CBTHeat.Settings.OverheatedMovePenalty[0];
+            }
+
+            if (turn > count)
+            {
+                turn = count;
+            }
+
+            return CBTHeat.Settings.OverheatedMovePenalty[turn - 1];
         }
 
         public static float getHeatToHitModifierForTurn(int turn)

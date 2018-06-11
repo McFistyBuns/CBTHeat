@@ -14,6 +14,7 @@
         "ShutdownPercentages": [0.083, 0.278, 0.583, 0.833],
         "AmmoExplosionPercentages": [0, 0.083, 0.278, 0.583],
         "HeatToHitModifiers": [1, 2, 3, 4],
-        "UseGuts": false
+        "UseGuts": false,
+        "OverheatedMovePenalty": [0.1, 0.2, 0.3, 0.4]
     }
 }

@@ -11,4 +11,8 @@
         "GutsBaseFloor": 0,
         "GutsDivisor": 40
     },
+    "MoveConstants":
+    {
+        "OverheatedMovePenalty": 0
+    },
 }
