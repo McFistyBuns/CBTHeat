@@ -21,13 +21,12 @@ These chances are also displayed in the Overheat notification badge above the he
 
 All chances and modifiers are configurable in the mod.json file.
 
----
 ## Installation
 
 Install [BTML](https://github.com/Mpstark/BattleTechModLoader) and [ModTek](https://github.com/Mpstark/ModTek). Extract files to `BATTLETECH\Mods\CBTHeat\`.
 
 ## Changelog
----
+
 ### v0.2.0
 Added an overheat movement modifier in a way that's similar to ToHit modifier.  This version sets the base OverheatedMovePenalty to 0 in CombatGameConstants.json and adds the mods modifier table set in mod.json.
 
