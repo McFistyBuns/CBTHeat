@@ -171,6 +171,13 @@ namespace CBTHeat
                 sequence.AddChildSequence(new DelaySequence(__instance.Combat, 2f), sequence.ChildSequenceCount - 1);
 
                 __instance.Combat.MessageCenter.PublishMessage(new AddSequenceToStackMessage(sequence));
+            } else {
+                int turnsOverheated = __instance.StatCollection.GetValue<int>("TurnsOverheated");
+
+                if (turnsOverheated > 0)
+                {
+                    __instance.StatCollection.Set<int>("TurnsOverheated", 0);
+                }
             }
         }
     }
