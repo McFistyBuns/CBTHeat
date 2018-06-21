@@ -6,11 +6,6 @@
         "CriticalHeatPerLocationHeavy": 0,
         "CriticalHeatPerLocationAssault": 0
     },
-    "PilotingConstants":
-    {
-        "GutsBaseFloor": 0,
-        "GutsDivisor": 40
-    },
     "MoveConstants":
     {
         "OverheatedMovePenalty": 0

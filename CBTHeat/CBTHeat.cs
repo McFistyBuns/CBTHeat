@@ -34,7 +34,7 @@ namespace CBTHeat
                 int turnsOverheated = mech.StatCollection.GetValue<int>("TurnsOverheated");
                 if (turnsOverheated > 0)
                 {
-                    float modifier = CBTHeat.getHeatToHitModifierForTurn(turnsOverheated);
+                    float modifier = CBTHeat.GetHeatToHitModifierForTurn(turnsOverheated);
 
                     __result = modifier;
                 } else {
@@ -64,7 +64,7 @@ namespace CBTHeat
             }
             else if (mech.IsOverheated)
             {
-                string descr = string.Format("This unit may trigger a Shutdown at the end of the turn unless heat falls below critical levels.\nShutdown Chance: {0:P2}\nAmmo Explosion Chance: {1:P2}", CBTHeat.getShutdownPercentageForTurn(turnsOverheated), CBTHeat.getAmmoExplosionPercentageForTurn(turnsOverheated));
+                string descr = string.Format("This unit may trigger a Shutdown at the end of the turn unless heat falls below critical levels.\nShutdown Chance: {0:P2}\nAmmo Explosion Chance: {1:P2}", CBTHeat.GetShutdownPercentageForTurn(turnsOverheated), CBTHeat.GetAmmoExplosionPercentageForTurn(turnsOverheated));
                 methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusOverheatingIcon, "OVERHEATING", descr, __instance.defaultIconScale, false });
             }
         }
@@ -84,21 +84,21 @@ namespace CBTHeat
 
             if (__instance.IsOverheated)
             {
-                PilotingRules rules = new PilotingRules(__instance.Combat);
-                float gutsTestChance = rules.GetGutsTestChance(__instance);
+                CBTPilotingRules rules = new CBTPilotingRules(__instance.Combat);
+                float gutsTestChance = rules.GetGutsModifier(__instance);
                 float skillRoll = __instance.Combat.NetworkRandom.Float();
                 float ammoRoll = __instance.Combat.NetworkRandom.Float();
 
                 int turnsOverheated = __instance.StatCollection.GetValue<int>("TurnsOverheated");
-                float shutdownPercentage = CBTHeat.getShutdownPercentageForTurn(turnsOverheated);
-                float ammoExplosionPercentage = CBTHeat.getAmmoExplosionPercentageForTurn(turnsOverheated);
+                float shutdownPercentage = CBTHeat.GetShutdownPercentageForTurn(turnsOverheated);
+                float ammoExplosionPercentage = CBTHeat.GetAmmoExplosionPercentageForTurn(turnsOverheated);
 
                 if (heatLogger.IsLogEnabled)
                 {
                     heatLogger.Log(string.Format("[CBTHeat] Turns Overheated: {0}", turnsOverheated));
                     heatLogger.Log(string.Format("[CBTHeat] Intiating Shutdown Override Check"));
                     heatLogger.Log(string.Format("[CBTHeat] Guts Skill: {0}", (float)__instance.SkillGuts));
-                    heatLogger.Log(string.Format("[CBTHeat] Guts Divisor: {0}", __instance.Combat.Constants.PilotingConstants.GutsDivisor));
+                    heatLogger.Log(string.Format("[CBTHeat] Guts Divisor: {0}", CBTHeat.Settings.GutsDivisor));
                     heatLogger.Log(string.Format("[CBTHeat] Guts Bonus: {0}", gutsTestChance));
                     heatLogger.Log(string.Format("[CBTHeat] Skill Roll: {0}", skillRoll));
                     heatLogger.Log(string.Format("[CBTHeat] Skill + Guts Roll: {0}", skillRoll+gutsTestChance));
@@ -117,54 +117,57 @@ namespace CBTHeat
                 MultiSequence sequence = new MultiSequence(__instance.Combat);
                 sequence.SetCamera(CameraControl.Instance.ShowDeathCam(__instance, false, -1f), 0);
 
-                if (ammoRoll < ammoExplosionPercentage)
+                if (CBTHeat.CanAmmoExplode(__instance))
                 {
-                    __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Ammo Overheated!", FloatieMessage.MessageNature.CriticalHit));
-
-                    foreach (AmmunitionBox ammoBox in __instance.ammoBoxes)
+                    if (ammoRoll < ammoExplosionPercentage)
                     {
-                        WeaponHitInfo fakeHit = new WeaponHitInfo(stackItemID, -1, -1, -1, string.Empty, string.Empty, -1, null, null, null, null, null, null, null, AttackDirection.None, Vector2.zero, null);
+                        __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Ammo Overheated!", FloatieMessage.MessageNature.CriticalHit));
 
-                        Vector3 onUnitSphere = UnityEngine.Random.onUnitSphere;
-                        __instance.NukeStructureLocation(fakeHit, ammoBox.Location, (ChassisLocations)ammoBox.Location, onUnitSphere, true);
-                        ChassisLocations dependentLocation = MechStructureRules.GetDependentLocation((ChassisLocations)ammoBox.Location);
-
-                        if (dependentLocation != ChassisLocations.None && !((Mech)ammoBox.parent).IsLocationDestroyed(dependentLocation))
+                        foreach (AmmunitionBox ammoBox in __instance.ammoBoxes)
                         {
-                            ((Mech)ammoBox.parent).NukeStructureLocation(fakeHit, ammoBox.Location, dependentLocation, onUnitSphere, true);
+                            WeaponHitInfo fakeHit = new WeaponHitInfo(stackItemID, -1, -1, -1, string.Empty, string.Empty, -1, null, null, null, null, null, null, null, AttackDirection.None, Vector2.zero, null);
+
+                            Vector3 onUnitSphere = UnityEngine.Random.onUnitSphere;
+                            __instance.NukeStructureLocation(fakeHit, ammoBox.Location, (ChassisLocations)ammoBox.Location, onUnitSphere, true);
+                            ChassisLocations dependentLocation = MechStructureRules.GetDependentLocation((ChassisLocations)ammoBox.Location);
+
+                            if (dependentLocation != ChassisLocations.None && !((Mech)ammoBox.parent).IsLocationDestroyed(dependentLocation))
+                            {
+                                ((Mech)ammoBox.parent).NukeStructureLocation(fakeHit, ammoBox.Location, dependentLocation, onUnitSphere, true);
+                            }
                         }
+
+                        return;
                     }
-                } 
-                else
-                {
+
                     sequence.AddChildSequence(new ShowActorInfoSequence(__instance, "Ammo Explosion Avoided!", FloatieMessage.MessageNature.Debuff, true), sequence.ChildSequenceCount - 1);
-
-                    if (!__instance.IsPastMaxHeat)
+                } 
+                
+                if (!__instance.IsPastMaxHeat)
+                {
+                    if (skillRoll < shutdownPercentage)
                     {
-                        if (skillRoll < shutdownPercentage)
+                        if (heatLogger.IsLogEnabled)
                         {
-                            if (heatLogger.IsLogEnabled)
-                            {
-                                heatLogger.Log(string.Format("[CBTHeat] Skill Check Failed! Initiating Shutdown"));
-                            }
-
-                            MechEmergencyShutdownSequence mechShutdownSequence = new MechEmergencyShutdownSequence(__instance);
-                            sequence.AddChildSequence(mechShutdownSequence, sequence.ChildSequenceCount - 1);
-
-                            __instance.StatCollection.Set<int>("TurnsOverheated", 0);
+                            heatLogger.Log(string.Format("[CBTHeat] Skill Check Failed! Initiating Shutdown"));
                         }
-                        else
+
+                        MechEmergencyShutdownSequence mechShutdownSequence = new MechEmergencyShutdownSequence(__instance);
+                        sequence.AddChildSequence(mechShutdownSequence, sequence.ChildSequenceCount - 1);
+
+                        __instance.StatCollection.Set<int>("TurnsOverheated", 0);
+                    }
+                    else
+                    {
+                        if (heatLogger.IsLogEnabled)
                         {
-                            if (heatLogger.IsLogEnabled)
-                            {
-                                heatLogger.Log(string.Format("[CBTHeat] Skill Check Succeeded!"));
-                            }
-
-                            sequence.AddChildSequence(new ShowActorInfoSequence(__instance, "Shutdown Override Successful!", FloatieMessage.MessageNature.Buff, true), sequence.ChildSequenceCount - 1);
-
-                            turnsOverheated += 1;
-                            __instance.StatCollection.Set<int>("TurnsOverheated", turnsOverheated);
+                            heatLogger.Log(string.Format("[CBTHeat] Skill Check Succeeded!"));
                         }
+
+                        sequence.AddChildSequence(new ShowActorInfoSequence(__instance, "Shutdown Override Successful!", FloatieMessage.MessageNature.Buff, true), sequence.ChildSequenceCount - 1);
+
+                        turnsOverheated += 1;
+                        __instance.StatCollection.Set<int>("TurnsOverheated", turnsOverheated);
                     }
                 }
 
@@ -193,7 +196,7 @@ namespace CBTHeat
 
             if (__instance.IsOverheated && turnsOverheated > 0)
             {
-                __result -= CBTHeat.getOverheatedMovePenaltyForTurn(turnsOverheated);
+                __result -= CBTHeat.GetOverheatedMovePenaltyForTurn(turnsOverheated);
             }
         }
     }
@@ -214,6 +217,9 @@ namespace CBTHeat
 
         [JsonProperty("UseGuts")]
         public bool UseGuts { get; set; }
+
+        [JsonProperty("GutsDivisor")]
+        public int GutsDivisor { get; set; }
 
         [JsonProperty("OverheatedMovePenalty")]
         //public IList<float> OverheatedMovePenalty = new List<float>() { 0.1f, 0.2f, 0.3f, 0.4f };
@@ -239,7 +245,7 @@ namespace CBTHeat
             }
         }
 
-        public static float getShutdownPercentageForTurn(int turn)
+        public static float GetShutdownPercentageForTurn(int turn)
         {
             int count = CBTHeat.Settings.ShutdownPercentages.Count;
 
@@ -256,7 +262,7 @@ namespace CBTHeat
             return CBTHeat.Settings.ShutdownPercentages[turn];
         }
 
-        public static float getAmmoExplosionPercentageForTurn(int turn)
+        public static float GetAmmoExplosionPercentageForTurn(int turn)
         {
             int count = CBTHeat.Settings.AmmoExplosionPercentages.Count;
 
@@ -273,7 +279,7 @@ namespace CBTHeat
             return CBTHeat.Settings.AmmoExplosionPercentages[turn];
         }
 
-        public static float getOverheatedMovePenaltyForTurn(int turn)
+        public static float GetOverheatedMovePenaltyForTurn(int turn)
         {
             int count = CBTHeat.Settings.OverheatedMovePenalty.Count;
 
@@ -290,7 +296,7 @@ namespace CBTHeat
             return CBTHeat.Settings.OverheatedMovePenalty[turn - 1];
         }
 
-        public static float getHeatToHitModifierForTurn(int turn)
+        public static float GetHeatToHitModifierForTurn(int turn)
         {
             int count = CBTHeat.Settings.HeatToHitModifiers.Count;
 
@@ -305,6 +311,46 @@ namespace CBTHeat
             }
 
             return (float)CBTHeat.Settings.HeatToHitModifiers[turn - 1];
+        }
+
+        public static bool CanAmmoExplode(Mech mech) {
+            if (mech.ammoBoxes.Count == 0)
+            {
+                return false;
+            }
+
+            int ammoCount = 0;
+
+            foreach (var ammoBox in mech.ammoBoxes)
+            {
+                ammoCount += ammoBox.CurrentAmmo;
+            }
+
+            if (ammoCount > 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public class CBTPilotingRules
+    {
+        private readonly CombatGameState combat;
+
+        public CBTPilotingRules(CombatGameState combat)
+        {
+            this.combat = combat;
+        }
+
+        public float GetGutsModifier(AbstractActor actor)
+        {
+            Pilot pilot = actor.GetPilot();
+
+            float num = (pilot != null) ? ((float)pilot.Guts) : 1f;
+            float gutsDivisor = CBTHeat.Settings.GutsDivisor;
+            return num / gutsDivisor;
         }
     }
 }
