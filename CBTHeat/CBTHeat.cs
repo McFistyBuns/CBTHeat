@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using BattleTech;
 using BattleTech.UI;
@@ -123,18 +124,11 @@ namespace CBTHeat
                     {
                         __instance.Combat.MessageCenter.PublishMessage(new FloatieMessage(__instance.GUID, __instance.GUID, "Ammo Overheated!", FloatieMessage.MessageNature.CriticalHit));
 
-                        foreach (AmmunitionBox ammoBox in __instance.ammoBoxes)
+                        var ammoBox = __instance.ammoBoxes.Where(box => box.CurrentAmmo > 0).OrderByDescending(box => box.CurrentAmmo / box.AmmoCapacity).FirstOrDefault();
+                        if (ammoBox != null)
                         {
-                            WeaponHitInfo fakeHit = new WeaponHitInfo(stackItemID, -1, -1, -1, string.Empty, string.Empty, -1, null, null, null, null, null, null, null, AttackDirection.None, Vector2.zero, null);
-
-                            Vector3 onUnitSphere = UnityEngine.Random.onUnitSphere;
-                            __instance.NukeStructureLocation(fakeHit, ammoBox.Location, (ChassisLocations)ammoBox.Location, onUnitSphere, true);
-                            ChassisLocations dependentLocation = MechStructureRules.GetDependentLocation((ChassisLocations)ammoBox.Location);
-
-                            if (dependentLocation != ChassisLocations.None && !((Mech)ammoBox.parent).IsLocationDestroyed(dependentLocation))
-                            {
-                                ((Mech)ammoBox.parent).NukeStructureLocation(fakeHit, ammoBox.Location, dependentLocation, onUnitSphere, true);
-                            }
+                            var fakeHit = new WeaponHitInfo(stackItemID, -1, -1, -1, string.Empty, string.Empty, -1, null, null, null, null, null, null, null, AttackDirection.None, Vector2.zero, null);
+                            ammoBox.DamageComponent(fakeHit, ComponentDamageLevel.Destroyed, true);
                         }
 
                         return;
