@@ -7,6 +7,7 @@ using BattleTech.UI;
 using HBS.Util;
 using Harmony;
 using HBS;
+using Localize;
 using SVGImporter;
 using HBS.Logging;
 using UnityEngine;
@@ -56,17 +57,17 @@ namespace CBTHeat
         private static void Postfix(CombatHUDStatusPanel __instance, Mech mech)
         {
             var type = __instance.GetType();
-            MethodInfo methodInfo = type.GetMethod("ShowDebuff", (BindingFlags.NonPublic | BindingFlags.Instance), null, new Type[] { typeof(SVGAsset), typeof(string), typeof(string), typeof(Vector3), typeof(bool) }, new ParameterModifier[5]);
+            MethodInfo methodInfo = type.GetMethod("ShowDebuff", (BindingFlags.NonPublic | BindingFlags.Instance), null, new Type[] { typeof(SVGAsset), typeof(Text), typeof(Text), typeof(Vector3), typeof(bool) }, new ParameterModifier[5]);
             int turnsOverheated = mech.StatCollection.GetValue<int>("TurnsOverheated");
 
             if (mech.IsShutDown)
             {
-                methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusShutDownIcon, "SHUT DOWN", "This target is easier to hit, and Called Shots can be made against this target.", __instance.defaultIconScale, false });
+                methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusShutDownIcon, new Text("SHUT DOWN", new object[0]), new Text("This target is easier to hit, and Called Shots can be made against this target.", new object[0]), __instance.defaultIconScale, false });
             }
             else if (mech.IsOverheated)
             {
                 string descr = string.Format("This unit may trigger a Shutdown at the end of the turn unless heat falls below critical levels.\nShutdown Chance: {0:P2}\nAmmo Explosion Chance: {1:P2}", CBTHeat.GetShutdownPercentageForTurn(turnsOverheated), CBTHeat.GetAmmoExplosionPercentageForTurn(turnsOverheated));
-                methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusOverheatingIcon, "OVERHEATING", descr, __instance.defaultIconScale, false });
+                methodInfo.Invoke(__instance, new object[] { LazySingletonBehavior<UIManager>.Instance.UILookAndColorConstants.StatusOverheatingIcon, new Text("OVERHEATING", new object[0]), new Text(descr, new object[0]), __instance.defaultIconScale, false });
             }
         }
     }
@@ -181,7 +182,7 @@ namespace CBTHeat
 
 
     [HarmonyPatch(typeof(Mech))]
-    [HarmonyPatch("MoveMultiplier", PropertyMethod.Getter)]
+    [HarmonyPatch("MoveMultiplier", MethodType.Getter)]
     public static class Mech_MoveMultiplier_Patch
     {
         private static void Postfix(Mech __instance, ref float __result)
